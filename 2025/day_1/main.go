@@ -14,51 +14,70 @@ type Lock struct {
 	timesReachedZero int
 }
 
-func (l *Lock) rotate(ticks int) {
-	log.Printf("Starting Rotation from %d\n", l.currentPosition)
-	log.Printf("Rotating %d\n", ticks)
+func (l *Lock) rotateRight(ticks int) {
+	log.Printf("[Start] Rotating right from %d + %d\n", l.currentPosition, ticks)
 
 	l.currentPosition += ticks
+
+	if newZeros := l.currentPosition / 100; newZeros > 0 {
+		log.Printf("Adding %d 0s\n", newZeros)
+		l.timesReachedZero += newZeros
+	}
+
 	l.currentPosition %= 100
 
-	if l.currentPosition < 0 {
-		l.currentPosition += 100
-	}
-
-	log.Printf("New position is %d\n", l.currentPosition)
-
-	if l.currentPosition == 0 {
-		l.timesReachedZero++
-	}
+	log.Printf("[End] New Position is %d\n", l.currentPosition)
 }
 
-func parseTicks(line string) (int, error) {
+func (l *Lock) rotateLeft(ticks int) {
+	log.Printf("[Start] Rotating left from %d - %d\n", l.currentPosition, ticks)
+
+	if l.currentPosition == 0 {
+		l.currentPosition = 100
+	}
+
+	l.currentPosition -= ticks
+
+	if newZeros := l.currentPosition / -100; newZeros > 0 {
+		log.Printf("Adding %d 0s\n", newZeros)
+		l.timesReachedZero += newZeros
+	}
+
+	l.currentPosition %= 100
+	if l.currentPosition < 0 {
+		log.Printf("Adding another 0 to the counter, because currentPosition is still < 0\n")
+		l.timesReachedZero++
+		l.currentPosition += 100
+	}
+	if l.currentPosition == 0 {
+		log.Printf("New position is 0! Adding to counter.\n")
+		l.timesReachedZero++
+	}
+
+	log.Printf("[End] New Position is %d\n", l.currentPosition)
+}
+
+func (l *Lock) rotateFromInstruction(line string) error {
 	ticks, err := strconv.ParseInt(line[1:], 10, 0)
 	if err != nil {
-		return 0, fmt.Errorf("Error parsing number of ticks: %w", err)
+		return fmt.Errorf("Error parsing number of ticks: %w", err)
 	}
 
 	switch line[0] {
 	case 'R':
-		return int(ticks), nil
+		l.rotateRight(int(ticks))
+		return nil
 	case 'L':
-		return -int(ticks), nil
+		l.rotateLeft(int(ticks))
+		return nil
 	}
 
-	return 0, fmt.Errorf("Error parsing instruction. Expected 'L' or 'R', got %c", line[0])
-}
-
-func (l *Lock) rotateFromInstruction(line string) error {
-	ticks, err := parseTicks(line)
-	if err != nil {
-		return err
-	}
-
-	l.rotate(ticks)
-	return nil
+	return fmt.Errorf("Error parsing instruction. Expected 'L' or 'R', got %c", line[0])
 }
 
 func passwordFromInstructionFile(pathToInstructions string) error {
+	log.SetOutput(io.Discard)
+
 	file, err := os.Open(pathToInstructions)
 	if err != nil {
 		return fmt.Errorf("Error opening file: %w", err)
@@ -98,9 +117,19 @@ func testInput() {
 	fmt.Printf("Password is: %d\n", l.timesReachedZero)
 }
 
-func main() {
-	log.SetOutput(io.Discard)
+func testBigRotation() {
+	l := Lock{currentPosition: 50}
+	l.rotateFromInstruction("R1000")
+	l.rotateFromInstruction("R550")
+	fmt.Printf("password would be: %d\n", l.timesReachedZero)
 
+	l = Lock{currentPosition: 50}
+	l.rotateFromInstruction("L1000")
+	l.rotateFromInstruction("L550")
+	fmt.Printf("password would be: %d\n", l.timesReachedZero)
+}
+
+func main() {
 	if length := len(os.Args); length != 2 {
 		log.Fatalf("Expected 1 argument, got %d", length)
 	}
