@@ -11,25 +11,24 @@ import (
 )
 
 func getJoltage(batteries []byte) (int, error) {
-	frontPart := batteries[:len(batteries)-1]
-	log.Printf("len(batteris) = %d, len(frontPart) = %d\n", len(batteries), len(frontPart))
+	joltage := [12]byte{}
 
-	maxIndexFront, err := getMaxIndex(frontPart)
-	if err != nil {
-		return 0, fmt.Errorf("Error getting max index of front part: %w", err)
+	start := 0
+	for i := range joltage {
+		end := len(batteries) - (len(joltage) - 1 - i)
+		currentBatteries := batteries[start:end]
+		log.Printf("start = %d, end = %d, currentBatteries = %+v\n", start, end, currentBatteries)
+		maxIndex, err := getMaxIndex(currentBatteries)
+		if err != nil {
+			return 0, fmt.Errorf("Error getting max index at loop iteration %d: %w", i, err)
+		}
+
+		joltage[i] = currentBatteries[maxIndex]
+		start += maxIndex + 1
 	}
 
-	backPart := batteries[maxIndexFront+1:]
-	log.Printf("maxIndexFront = %d, len(backPart) = %d\n", maxIndexFront, len(backPart))
-	maxIndexBack, err := getMaxIndex(backPart)
-	if err != nil {
-		return 0, fmt.Errorf("Error getting max index of back part: %w", err)
-	}
-
-	joltageString := fmt.Sprintf("%c%c", frontPart[maxIndexFront], backPart[maxIndexBack])
-	log.Printf("joltageString: %s\n", joltageString)
-	joltage, err := strconv.ParseInt(joltageString, 10, 0)
-	return int(joltage), err
+	output, err := strconv.ParseInt(string(joltage[:]), 10, 0)
+	return int(output), err
 }
 
 func getMaxIndex(bytes []byte) (int, error) {
