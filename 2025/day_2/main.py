@@ -3,13 +3,25 @@ from sys import argv
 
 def id_is_invalid(id: int):
     id_as_string = str(id)
+
     id_length = len(id_as_string)
-    if id_length % 2 != 0:
-        return False
 
-    pattern = id_as_string[0:id_length // 2]
+    pattern_length = 0
+    while (pattern_length + 1) * 2 <= id_length:
+        pattern_length += 1
 
-    return id_as_string == pattern * 2
+        if id_length % pattern_length != 0:
+            continue
+
+        pattern = id_as_string[0:pattern_length]
+
+        pattern_occurence = id_length // pattern_length
+
+        if id_as_string == pattern * pattern_occurence:
+            return True
+
+    return False
+
 
 def get_ranges_from_input(input_string: str):
     ranges = input_string.split(",")
@@ -27,10 +39,11 @@ def get_total_from_range(r: tuple[int, int]):
     total = 0
     for id in range(r[0], r[1] + 1):
         if id_is_invalid(id):
-            print(f"{id} is invalid")
+            # print(f"{id} is invalid")
             total += id
 
     return total
+
 
 def test():
     input = "11-22,95-115,998-1012,1188511880-1188511890,222220-222224,1698522-1698528,446443-446449,38593856-38593862,565653-565659,824824821-824824827,2121212118-2121212124"
@@ -41,7 +54,7 @@ def test():
         total += get_total_from_range(r)
 
     print(f"the total is {total}")
-    if total != 1227775554:
+    if total != 4174379265:
         raise Exception("total doesn't match expected total")
 
 
@@ -59,6 +72,7 @@ def get_total_ids_from_input_file():
         total += get_total_from_range(r)
 
     print(f"total is {total}")
+
 
 if __name__ == "__main__":
     get_total_ids_from_input_file()
