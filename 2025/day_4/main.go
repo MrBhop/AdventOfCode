@@ -191,6 +191,40 @@ func test() {
 	fmt.Printf("Total reachable rolls: %d\n", total)
 }
 
+func testPaperGrid() {
+	input := `..@@.@@@@.
+@@@.@.@.@@
+@@@@@.@.@@
+@.@@@@..@.
+@@.@@@@.@@
+.@@@@@@@.@
+.@.@.@.@@@
+@.@@@.@@@@
+.@@@@@@@@.
+@.@.@@@.@.`
+
+	r := strings.NewReader(input)
+	s := bufio.NewScanner(r)
+
+	p, err := NewGrid(s, '.', '@')
+	if err != nil {
+		log.Fatalf("Error creating paperGrid: %v", err)
+	}
+
+	fmt.Printf("Total reachable rolls: %d\n", p.getNumberOfReachableRolls())
+
+	fmt.Printf("%s\n", p)
+
+	rollsRemoved, err := p.removeAllReachableRolls()
+	if err != nil {
+		log.Fatalf("Error removing rolls: %v", err)
+	}
+
+	fmt.Printf("%s\n", p)
+
+	fmt.Printf("Total rolls removed: %d\n", rollsRemoved)
+}
+
 func main() {
 	if length := len(os.Args); length != 2 {
 		log.Fatalf("Expected 1 argument, got %d\n", length - 1)
@@ -201,10 +235,18 @@ func main() {
 	}
 
 	s := bufio.NewScanner(file)
-	total, err := getReachableRolls(s)
+	p, err := NewGrid(s, '.', '@')
 	if err != nil {
-		log.Fatalf("Error getting reachable roll count: %w", err)
+		log.Fatalf("Error creating paperGrid: %v", err)
 	}
 
+	total := p.getNumberOfReachableRolls()
 	fmt.Printf("Total reachable rolls: %d\n", total)
+
+	total, err = p.removeAllReachableRolls()
+	if err != nil {
+		log.Fatalf("Error removing rolls: %v", err)
+	}
+
+	fmt.Printf("Total rolls removed: %d\n", total)
 }
