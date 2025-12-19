@@ -1,6 +1,10 @@
 from io import StringIO, TextIOBase
+import logging
 from sys import argv
 from typing import override
+
+
+logger = logging.getLogger(__name__)
 
 
 class database:
@@ -12,21 +16,21 @@ class database:
         output = "database:\n"
 
         index = 0
-        for range in self.valid_ranges:
-            output += f"{index}: {range[0]} - {range[1]}\n"
+        for r in self.valid_ranges:
+            output += f"{index}: {r[0]} - {r[1]}\n"
             index += 1
 
         return output
 
     def id_is_valid(self, id: int):
-        print(f"checking id {id}")
+        logger.debug(f"checking id {id}")
         index = 0
-        for range in self.valid_ranges:
-            if range[0] > id:
-                print(f"id is below range {index}: {range}")
+        for r in self.valid_ranges:
+            if r[0] > id:
+                logger.debug(f"id is below range {index}: {r}")
                 return False
-            if range[0] <= id and range[1] >= id:
-                print(f"id is in range {index}: {range}")
+            if r[0] <= id and r[1] >= id:
+                # logger.debug(f"id is in range {index}: {r}")
                 return True
             index += 1
         raise Exception("just curious if this can happen")
@@ -35,15 +39,25 @@ class database:
     def from_ranges(ranges: list[tuple[int, int]]):
         sorted_ranges = sorted(ranges, key=lambda item: item[0])
 
+        logger.debug("sorted ranges:")
+        for r in sorted_ranges:
+            logger.debug(f"{r[0]} - {r[1]}")
+
         final_ranges: list[tuple[int, int]] = []
 
+        logger.debug("merging ranges ...")
         current_range = sorted_ranges[0]
-        for range in sorted_ranges:
-            if range[0] <= current_range[1]:
-                current_range = (current_range[0], range[1])
+        logger.debug(f"current_range = {current_range[0]} - {current_range[1]}")
+        for r in sorted_ranges:
+            logger.debug(f"r = {r[0]} - {r[1]}")
+            if r[0] <= current_range[1] and r[1] >= current_range[1]:
+                logger.debug("extending current_range ...")
+                current_range = (current_range[0], r[1])
             else:
+                logger.debug("starting new range ...\n")
                 final_ranges.append(current_range)
-                current_range = range
+                current_range = r
+            logger.debug(f"current_range = {current_range[0]} - {current_range[1]}")
 
         final_ranges.append(current_range)
 
@@ -64,8 +78,8 @@ class database:
         return database.from_ranges(ranges)
 
     def validate_ids_from_file(self, file: TextIOBase):
-        print("validating ids from file")
-        print(self)
+        logger.debug("validating ids from file")
+        logger.debug(self)
         total = 0
 
         for line in file:
@@ -75,6 +89,15 @@ class database:
             id = int(line)
             if self.id_is_valid(id):
                 total += 1
+
+        return total
+
+    def count_valid_ids(self):
+        total = 0
+        for r in self.valid_ranges:
+            ids_in_range = r[1] - r[0] + 1
+            total += ids_in_range 
+            logger.debug(f"{r[1]} - {r[0]} + 1 = {ids_in_range}")
 
         return total
 
@@ -133,32 +156,11 @@ def main():
         db = database.from_file(f)
         total = db.validate_ids_from_file(f)
 
-    print(f"valid ids: {total}")
+    print(f"valid ids from file: {total}")
+    print(f"valid ids in ranges: {db.count_valid_ids()}")
 
 
 if __name__ == "__main__":
-    length = len(argv)
-    if length != 2:
-        raise Exception(f"Expected 1 argument, got {length - 1}.")
+    logging.basicConfig(level=logging.DEBUG)
 
-    with open(argv[1]) as f:
-        ranges: list[tuple[int, int]] = []
-
-        for line in f:
-            line = line.strip()
-
-            if line == "":
-                break
-            parts = line.split("-")
-            ranges.append((int(parts[0]), int(parts[1])))
-
-        total = 0
-        for line in f:
-            id = int(line.strip())
-
-            for range in ranges:
-                if range[0] <= id and range[1] >= id:
-                    total += 1
-                    break
-
-    print(f"valid ids: {total}")
+    main()
