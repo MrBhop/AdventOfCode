@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from io import StringIO, TextIOBase
 import logging
 from sys import argv
@@ -7,98 +8,106 @@ from typing import override
 logger = logging.getLogger(__name__)
 
 
-class database:
-    def __init__(self, valid_ranges: list[tuple[int, int]] | None = None) -> None:
-        self.valid_ranges: list[tuple[int, int]] = valid_ranges or []
+@dataclass
+class IdRange:
+    lower_bound: int
+    upper_bound: int
+
+    def count_valid_ids(self):
+        return self.upper_bound - self.lower_bound + 1
+
+    @staticmethod
+    def from_string(input: str):
+        parts = input.split("-")
+        return IdRange(int(parts[0]), int(parts[1]))
 
     @override
     def __repr__(self) -> str:
-        output = "database:\n"
+        return f"IdRange({self.lower_bound}-{self.upper_bound})"
 
-        index = 0
-        for r in self.valid_ranges:
-            output += f"{index}: {r[0]} - {r[1]}\n"
-            index += 1
 
-        return output
+def merge_ranges(id_ranges: list[IdRange]):
+    """Returns a new list of sorted and merged ranges, covering the same numbers as the input ranges."""
+
+    logger.debug("merging ranges")
+
+    # sort the input by lower_bound.
+    sorted_ranges = sorted(id_ranges, key=lambda item: item.lower_bound)
+
+    final_ranges: list[IdRange] = []
+    current_range = sorted_ranges[0]
+
+    for r in sorted_ranges:
+        logger.debug("current_range:")
+        logger.debug("%s", current_range)
+        logger.debug("r:")
+        logger.debug("%s", r)
+        if r.lower_bound <= current_range.upper_bound + 1:
+            # r overlaps with current_range. Merge 'em.
+            current_range.upper_bound = max(current_range.upper_bound, r.upper_bound)
+            logger.debug("merged range.")
+        else:
+            # r does not overlap with current_range. Add current_range to the output and use r for the next loop.
+            final_ranges.append(current_range)
+            current_range = r
+            logger.debug("starting new range.\n")
+    if current_range.upper_bound != final_ranges[-1].upper_bound:
+        # if the leftover current_range is not already in the output, add it as well.
+        final_ranges.append(current_range)
+    return final_ranges
+
+
+@dataclass
+class Database:
+    id_ranges: list[IdRange]
+
+    @override
+    def __repr__(self) -> str:
+        return f"Database({',\n'.join([repr(item) for item in self.id_ranges])})"
 
     def id_is_valid(self, id: int):
-        logger.debug(f"checking id {id}")
-        index = 0
-        for r in self.valid_ranges:
-            if r[0] > id:
-                logger.debug(f"id is below range {index}: {r}")
-                return False
-            if r[0] <= id and r[1] >= id:
-                # logger.debug(f"id is in range {index}: {r}")
+        for r in self.id_ranges:
+            if r.lower_bound <= id and r.upper_bound >= id:
+                logger.debug("id %d is in range %s", id, r)
                 return True
-            index += 1
-        raise Exception("just curious if this can happen")
+        logger.debug("id %d is not in any range.", id)
+        return False
+
+    def count_valid_ids(self):
+        total = 0
+        for r in self.id_ranges:
+            total += r.count_valid_ids()
+        return total
 
     @staticmethod
-    def from_ranges(ranges: list[tuple[int, int]]):
-        sorted_ranges = sorted(ranges, key=lambda item: item[0])
+    def from_ranges(id_ranges: list[IdRange]):
+        merged_ranges = merge_ranges(id_ranges)
 
-        logger.debug("sorted ranges:")
-        for r in sorted_ranges:
-            logger.debug(f"{r[0]} - {r[1]}")
-
-        final_ranges: list[tuple[int, int]] = []
-
-        logger.debug("merging ranges ...")
-        current_range = sorted_ranges[0]
-        logger.debug(f"current_range = {current_range[0]} - {current_range[1]}")
-        for r in sorted_ranges:
-            logger.debug(f"r = {r[0]} - {r[1]}")
-            if r[0] <= current_range[1] and r[1] >= current_range[1]:
-                logger.debug("extending current_range ...")
-                current_range = (current_range[0], r[1])
-            else:
-                logger.debug("starting new range ...\n")
-                final_ranges.append(current_range)
-                current_range = r
-            logger.debug(f"current_range = {current_range[0]} - {current_range[1]}")
-
-        final_ranges.append(current_range)
-
-        output = database(final_ranges)
-        return output
+        return Database(merged_ranges)
 
     @staticmethod
     def from_file(file: TextIOBase):
-        ranges: list[tuple[int, int]] = []
+        ranges: list[IdRange] = []
 
         for line in file:
             line = line.strip()
+
             if line == "":
                 break
-            parts = line.split("-")
-            ranges.append((int(parts[0]), int(parts[1])))
-
-        return database.from_ranges(ranges)
+            ranges.append(IdRange.from_string(line))
+        return Database.from_ranges(ranges)
 
     def validate_ids_from_file(self, file: TextIOBase):
-        logger.debug("validating ids from file")
-        logger.debug(self)
         total = 0
 
         for line in file:
             line = line.strip()
+
             if line == "":
                 break
             id = int(line)
             if self.id_is_valid(id):
                 total += 1
-
-        return total
-
-    def count_valid_ids(self):
-        total = 0
-        for r in self.valid_ranges:
-            ids_in_range = r[1] - r[0] + 1
-            total += ids_in_range 
-            logger.debug(f"{r[1]} - {r[0]} + 1 = {ids_in_range}")
-
         return total
 
 
@@ -116,7 +125,7 @@ def test():
 32"""
 
     string_as_file = StringIO(input)
-    db = database.from_file(string_as_file)
+    db = Database.from_file(string_as_file)
 
     total = db.validate_ids_from_file(string_as_file)
 
@@ -140,7 +149,7 @@ def test_custom():
         """
 
     string_as_file = StringIO(input)
-    db = database.from_file(string_as_file)
+    db = Database.from_file(string_as_file)
 
     total = db.validate_ids_from_file(string_as_file)
 
@@ -153,7 +162,7 @@ def main():
         raise Exception(f"Expected 1 argument, got {length - 1}.")
 
     with open(argv[1]) as f:
-        db = database.from_file(f)
+        db = Database.from_file(f)
         total = db.validate_ids_from_file(f)
 
     print(f"valid ids from file: {total}")
